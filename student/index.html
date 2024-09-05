@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام الحضور الطلابي</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrious/dist/qrious.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+        input[type="text"], input[type="password"], input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 16px;
+            margin: 5px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #qr-reader {
+            width: 100%;
+            max-width: 600px;
+            height: 400px;
+            margin: 0 auto;
+        }
+        #attendance-list, #student-list {
+            margin-top: 20px;
+            text-align: left;
+            display: inline-block;
+            max-width: 600px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        #add-student, #edit-student {
+            margin-bottom: 20px;
+        }
+        #qr-container img {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- صفحة تسجيل الدخول -->
+    <div id="login-container">
+        <h2>تسجيل الدخول</h2>
+        <form id="login-form">
+            <label for="username">اسم المستخدم:</label>
+            <input type="text" id="username" required>
+            <label for="password">كلمة المرور:</label>
+            <input type="password" id="password" required>
+            <button type="submit">تسجيل الدخول</button>
+        </form>
+    </div>
+
+    <!-- الصفحة الرئيسية -->
+    <div id="main-container" class="hidden">
+        <h1>نظام الحضور الطلابي</h1>
+
+        <!-- قراءة QR Codes -->
+        <div id="qr-reader" class="hidden"></div>
+        <button id="scan-qr">ابدأ مسح QR Code</button>
+
+        <!-- إضافة بيانات الطلاب -->
+        <div id="add-student">
+            <h2>إضافة طالب جديد</h2>
+            <form id="student-form">
+                <label for="student-id">رقم الطالب:</label>
+                <input type="text" id="student-id" name="student-id" required>
+                <br>
+                <label for="student-name">اسم الطالب:</label>
+                <input type="text" id="student-name" name="student-name" required>
+                <br>
+                <label for="student-class">الفصل:</label>
+                <input type="text" id="student-class" name="student-class" required>
+                <br>
+                <button type="submit">إضافة طالب</button>
+            </form>
+        </div>
+
+        <!-- عرض الطلاب المسجلين مسبقًا -->
+        <button id="show-students">عرض الطلاب المسجلين</button>
+        <div id="student-list" class="hidden">
+            <h2>الطلاب المسجلين</h2>
+            <table id="students-table">
+                <thead>
+                    <tr>
+                        <th>رقم الطالب</th>
+                        <th>اسم الطالب</th>
+                        <th>الفصل</th>
+                        <th>رمز QR</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Student records will be added here -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- واجهة تعديل بيانات الطلاب -->
+        <div id="edit-student" class="hidden">
+            <h2>تعديل بيانات الطالب</h2>
+            <form id="edit-form">
+                <input type="hidden" id="edit-student-id">
+                <label for="edit-student-name">اسم الطالب:</label>
+                <input type="text" id="edit-student-name" name="student-name" required>
+                <br>
+                <label for="edit-student-class">الفصل:</label>
+                <input type="text" id="edit-student-class" name="student-class" required>
+                <br>
+                <button type="submit">تحديث الطالب</button>
+            </form>
+        </div>
+
+        <!-- عرض QR codes -->
+        <div id="qr-codes">
+            <h2>رموز QR المولدة</h2>
+            <div id="qr-container"></div>
+            <button id="download-registered-students">تحميل الطلاب المسجلين</button>
+        </div>
+
+        <!-- عرض سجل الحضور -->
+        <div id="attendance-list">
+            <h2>سجل الحضور</h2>
+            <table id="attendance-table">
+                <thead>
+                    <tr>
+                        <th>رقم الطالب</th>
+                        <th>اسم الطالب</th>
+                        <th>الفصل</th>
+                        <th>التوقيت</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Attendance records will be added here -->
+                </tbody>
+            </table>
+            <button id="download-csv">تحميل بيانات الحضور</button>
+            <button id="clear-data">مسح البيانات</button>
+        </div>
+
+        <!-- رفع بيانات الطلاب -->
+        <div id="upload-students">
+            <h2>رفع بيانات الطلاب</h2>
+            <input type="file" id="upload-file" accept=".xlsx">
+            <button id="process-upload">معالجة البيانات</button>
+        </div>
+    </div>
+
+    <script>
+        // بيانات تسجيل الدخول
+        const LOGIN_USERNAME = 'admin';
+        const LOGIN_PASSWORD = 'asa7777777';
+
+        // بيانات الطلاب وسجل الحضور
+        const studentRecords = JSON.parse(localStorage.getItem('studentRecords')) || [];
+        const attendanceRecords = JSON.parse(localStorage.getItem('attendanceRecords')) || [];
+        const qrContainer = document.getElementById("qr-container");
+
+        document.getElementById("login-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            if (username === LOGIN_USERNAME && password === LOGIN_PASSWORD) {
+                document.getElementById("login-container").classList.add("hidden");
+                document.getElementById("main-container").classList.remove("hidden");
+            } else {
+                alert("اسم المستخدم أو كلمة المرور غير صحيحة");
+            }
+        });
+
+        function saveToLocalStorage() {
+            localStorage.setItem('studentRecords', JSON.stringify(studentRecords));
+            localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
+        }
+
+        function updateStudentTable() {
+            const studentsTableBody = document.querySelector("#students-table tbody");
+            studentsTableBody.innerHTML = '';
+            studentRecords.forEach(record => {
+                const row = document.createElement("tr");
+                const idCell = document.createElement("td");
+                const nameCell = document.createElement("td");
+                const classCell = document.createElement("td");
+                const qrCell = document.createElement("td");
+                const actionsCell = document.createElement("td");
+
+                idCell.textContent = record.id;
+                nameCell.textContent = record.name;
+                classCell.textContent = record.class;
+
+                const qrImg = document.createElement("img");
+                qrImg.src = record.qrCode; // Display QR code image
+                qrImg.style.width = '100px';
+                qrImg.style.height = '100px';
+                qrCell.appendChild(qrImg);
+
+                const editButton = document.createElement("button");
+                editButton.textContent = "تعديل";
+                editButton.onclick = () => editStudent(record.id);
+
+                const deleteButton = document.createElement("button");
+                deleteButton.textContent = "حذف";
+                deleteButton.onclick = () => deleteStudent(record.id);
+
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+                row.appendChild(idCell);
+                row.appendChild(nameCell);
+                row.appendChild(classCell);
+                row.appendChild(qrCell);
+                row.appendChild(actionsCell);
+                studentsTableBody.appendChild(row);
+            });
+        }
+
+        function editStudent(id) {
+            const student = studentRecords.find(record => record.id === id);
+            if (student) {
+                document.getElementById("edit-student-id").value = student.id;
+                document.getElementById("edit-student-name").value = student.name;
+                document.getElementById("edit-student-class").value = student.class;
+                document.getElementById("edit-student").classList.remove("hidden");
+            }
+        }
+
+        function deleteStudent(id) {
+            const index = studentRecords.findIndex(record => record.id === id);
+            if (index > -1) {
+                studentRecords.splice(index, 1);
+                saveToLocalStorage();
+                updateStudentTable();
+            }
+        }
+
+        document.getElementById("student-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const studentId = document.getElementById("student-id").value;
+            const studentName = document.getElementById("student-name").value;
+            const studentClass = document.getElementById("student-class").value;
+
+            const qr = new QRious({
+                value: studentId,
+                size: 100
+            });
+
+            const qrCode = qr.toDataURL();
+
+            studentRecords.push({ id: studentId, name: studentName, class: studentClass, qrCode });
+            saveToLocalStorage();
+            updateStudentTable();
+
+            document.getElementById("student-form").reset();
+        });
+
+        document.getElementById("edit-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const studentId = document.getElementById("edit-student-id").value;
+            const studentName = document.getElementById("edit-student-name").value;
+            const studentClass = document.getElementById("edit-student-class").value;
+
+            const student = studentRecords.find(record => record.id === studentId);
+            if (student) {
+                student.name = studentName;
+                student.class = studentClass;
+                saveToLocalStorage();
+                updateStudentTable();
+                document.getElementById("edit-student").classList.add("hidden");
+            }
+        });
+
+        document.getElementById("scan-qr").addEventListener("click", function() {
+            document.getElementById("qr-reader").classList.remove("hidden");
+            const html5QrCode = new Html5Qrcode("qr-reader");
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: 250
+                },
+                (decodedText, decodedResult) => {
+                    alert(`QR Code detected: ${decodedText}`);
+                    const student = studentRecords.find(record => record.id === decodedText);
+                    if (student) {
+                        attendanceRecords.push({ ...student, timestamp: new Date().toLocaleString() });
+                        saveToLocalStorage();
+                        updateAttendanceTable();
+                    }
+                },
+                (errorMessage) => {
+                    console.log(`QR Code scan error: ${errorMessage}`);
+                }
+            ).catch((err) => {
+                console.error(`Error starting QR Code scanner: ${err}`);
+            });
+        });
+
+        document.getElementById("download-registered-students").addEventListener("click", function() {
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(studentRecords.map(student => ({
+                "رقم الطالب": student.id,
+                "اسم الطالب": student.name,
+                "الفصل": student.class,
+                "رمز QR": student.qrCode
+            })));
+
+            XLSX.utils.book_append_sheet(wb, ws, "الطلاب المسجلين");
+            XLSX.writeFile(wb, "students.xlsx");
+        });
+
+        document.getElementById("download-csv").addEventListener("click", function() {
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(attendanceRecords.map(record => ({
+                "رقم الطالب": record.id,
+                "اسم الطالب": record.name,
+                "الفصل": record.class,
+                "التوقيت": record.timestamp
+            })));
+
+            XLSX.utils.book_append_sheet(wb, ws, "سجل الحضور");
+            XLSX.writeFile(wb, "attendance.xlsx");
+        });
+
+        document.getElementById("process-upload").addEventListener("click", function() {
+            const fileInput = document.getElementById("upload-file");
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet);
+
+                    json.forEach(student => {
+                        const qr = new QRious({
+                            value: student["رقم الطالب"],
+                            size: 100
+                        });
+
+                        const qrCode = qr.toDataURL();
+
+                        studentRecords.push({ id: student["رقم الطالب"], name: student["اسم الطالب"], class: student["الفصل"], qrCode });
+                    });
+
+                    saveToLocalStorage();
+                    updateStudentTable();
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert("يرجى اختيار ملف");
+            }
+        });
+
+        function updateAttendanceTable() {
+            const attendanceTableBody = document.querySelector("#attendance-table tbody");
+            attendanceTableBody.innerHTML = '';
+            attendanceRecords.forEach(record => {
+                const row = document.createElement("tr");
+                const idCell = document.createElement("td");
+                const nameCell = document.createElement("td");
+                const classCell = document.createElement("td");
+                const timeCell = document.createElement("td");
+
+                idCell.textContent = record.id;
+                nameCell.textContent = record.name;
+                classCell.textContent = record.class;
+                timeCell.textContent = record.timestamp;
+
+                row.appendChild(idCell);
+                row.appendChild(nameCell);
+                row.appendChild(classCell);
+                row.appendChild(timeCell);
+                attendanceTableBody.appendChild(row);
+            });
+        }
+
+        document.getElementById("clear-data").addEventListener("click", function() {
+            if (confirm("هل أنت متأكد أنك تريد مسح جميع بيانات الحضور؟")) {
+                localStorage.removeItem('attendanceRecords');
+                attendanceRecords.length = 0;
+                updateAttendanceTable();
+            }
+        });
+
+        updateStudentTable();
+        updateAttendanceTable();
+    </script>
+</body>
+</html>
